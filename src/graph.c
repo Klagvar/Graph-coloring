@@ -74,8 +74,8 @@ static link EDGE_insert(Graph G, int from, int to) {
 
 /* Последовательный жадный */
 unsigned int *color_sequential_greedy(Graph G) {
-  unsigned int n = G->V; // Количество вершин в графе.
-  unsigned int *random_order = malloc(n * sizeof(unsigned int)); // Выделяем память для рандомного порядка вершин
+  unsigned int n = G->V; 
+  unsigned int *random_order = malloc(n * sizeof(unsigned int)); 
   if (random_order == NULL) {
     printf("Ошибка выделения массива случайного порядка!\n");
     return NULL;
@@ -103,13 +103,13 @@ unsigned int *color_sequential_greedy(Graph G) {
 
 /* Последовательный LDF */
 unsigned int *color_sequential_ldf(Graph G) {
-  unsigned int n = G->V; // Количество вершин в графе.
-  unsigned int *degree = malloc(n * sizeof(unsigned int)); // Выделение памяти для массива степеней вершин
+  unsigned int n = G->V; 
+  unsigned int *degree = malloc(n * sizeof(unsigned int)); 
   if (degree == NULL) {
     printf("Error allocating degrees array!\n");
     return NULL;
   }
-  unsigned int *vertex = malloc(n * sizeof(unsigned int)); // Выделение памяти для массива номеров вершин
+  unsigned int *vertex = malloc(n * sizeof(unsigned int)); 
   if (vertex == NULL) {
     printf("Error allocating vertex array!\n");
     return NULL;
@@ -140,104 +140,83 @@ unsigned int *color_sequential_ldf(Graph G) {
   return G->color;
 }
 
+
+
 /* Последовательный RLF */
-// Функция для проверки, является ли вершина несвязанной c вершинами из max_degree_vertices
-int is_unconnected(Graph G, unsigned int vertex, unsigned int *max_degree_vertices, unsigned int *count) {
-  for (link t = G->ladj[vertex]; t != G->z; t = t->next) {
-    for (int i = 0; i < *count; i++) {
-      // Проверяем, является ли текущая вершина смежной с вершиной максимальной степени
-      if (t->index == max_degree_vertices[i]) {
-        return 0; // Вершины связаны
-      }
-    }
-  }
-  return 1; // Вершина несвязана
-}
-
-// Функция для поиска всех несвязанных вершин с максимальным количеством соседей
-void find_max_degree_unconnected_vertices(Graph G, unsigned int *max_degree_vertices, unsigned int *max_degree, unsigned int *count) {
-  *max_degree = 0;
-  *count = 0;
-
-  // Находим максимальную степень
-  for (unsigned int i = 0; i < G->V; i++) {
-    if (G->color[i] == 0 && G->degree[i] > *max_degree) {
-      *max_degree = G->degree[i];
-    }
-  }
-  if(*max_degree == 0) {
-    return;
-  }
-  //printf("Максимальная степень: %d\n", *max_degree);
-
-  // Находим первую вершину с максимальной степенью и добавляю её в массив
-  for(unsigned int i = 0; i < G->V; i++) {
-    if (G->degree[i] == *max_degree && G->color[i] == 0) {
-      max_degree_vertices[*count] = i;
-      //printf("Первая вершина с максимальной степенью: %d\n", i+1);
-      (*count)++;
-      break;
-    }
-  }
-    
-    // Находим все несвязанные вершины с максимальной степенью
-  for (unsigned int i = max_degree_vertices[*count-1] + 1; i < G->V; i++) {
-    if (G->color[i] == 0 && G->degree[i] == *max_degree && is_unconnected(G, i, max_degree_vertices, count)) {
-      max_degree_vertices[*count] = i;
-      (*count)++;
-    }
-  }
-}
-
-
-// Рекурсивная функция для раскрашивания графа
-void rlf_color_graph(Graph G, unsigned int current_color) {
-  unsigned int max_degree_vertices[G->V];
-  unsigned int max_degree, count;
-
-  // Находим все несвязанные вершины с максимальным количеством соседей
-  //printf("\nРасскрашиваем вершины в цвет %d\n", current_color);
-  find_max_degree_unconnected_vertices(G, max_degree_vertices, &max_degree, &count);
-
-  // Если такие вершины не найдены, значит все вершины раскрашены
-  if (count == 0) {
-    //printf("Все вершины раскрашены!\n");
-    return;
-  } 
-  //printf("Вершины: ");
-
-  // Раскрашиваем найденные вершины
-  for (unsigned int i = 0; i < count; i++) {
-    //printf("%d ", max_degree_vertices[i] + 1);
-    G->color[max_degree_vertices[i]] = current_color;
-  }
-  //printf("\n");
-  // Рекурсивно вызываем функцию для оставшихся непокрашенных вершин
-  rlf_color_graph(G, current_color + 1);
-}
-
 unsigned int *color_rlf(Graph G) {
-  unsigned int *color = malloc(G->V * sizeof(unsigned int));
-  if (color == NULL) {
-    printf("Error allocating color array!\n");
+  unsigned int n = G->V; 
+  unsigned int *order = malloc(n * sizeof(unsigned int)); 
+  unsigned int *degree_copy = malloc(n * sizeof(unsigned int)); 
+  if (order == NULL || degree_copy == NULL) {
+    printf("Ошибка выделения памяти!\n");
     return NULL;
   }
-  unsigned int n = G->V;
-  for (unsigned int i = 0; i < n; i++) { // Инициализируем массив случайного порядка и массив цветов.
+  for (unsigned int i = 0; i < n; i++) { // Инициализируем массив порядка, массив цветов и копию степеней вершин.
     G->color[i] = 0;
+    order[i] = i;
+    degree_copy[i] = G->degree[i];
   }
-  // Начинаем с цвета 1 и вызываем рекурсивную функцию для раскрашивания графа
-  rlf_color_graph(G, 1);
-  free(color);
+
+  unsigned int color = 1; 
+  while (1) {
+    int max_degree_index = -1;
+    for (unsigned int i = 0; i < n; i++) { // Ищем нераскрашенную вершину с максимальной степенью
+      if (G->color[order[i]] == 0 && (max_degree_index == -1 || degree_copy[order[i]] > degree_copy[order[max_degree_index]])) {
+        max_degree_index = i;
+      }
+    }
+    if (max_degree_index == -1) { // Если все вершины раскрашены, выходим из цикла
+      break;
+    }
+
+    unsigned int *S = malloc(n * sizeof(unsigned int)); 
+    unsigned int S_size = 0;
+    S[S_size++] = order[max_degree_index]; // Добавляем вершину с максимальной степенью в S
+    //printf("\nРасскрашиваем макс вершину %d в цвет %d\n", order[max_degree_index] + 1, color);
+    G->color[order[max_degree_index]] = color; 
+
+    for (unsigned int i = 0; i < n; i++) {
+      if (G->color[order[i]] == 0) { // Если вершина нераскрашена
+        unsigned int j;
+        for (j = 0; j < S_size; j++) { // Проверяем, смежна ли она с вершинами из S
+          link t;
+          for (t = G->ladj[order[i]]; t != G->z && t->index != S[j]; t = t->next);
+          if (t != G->z) {
+            break;
+          }
+        }
+        if (j == S_size) { // Если вершина не смежна с вершинами из S, добавляем её в S и раскрашиваем
+          S[S_size++] = order[i];
+          //printf("Расскрашиваем вершину %d в цвет %d\n", order[i] + 1, color);
+          G->color[order[i]] = color;
+        }
+      }
+    }
+
+    free(S); 
+
+    for (unsigned int i = 0; i < n; i++) { // Обновляем степени вершин
+      if (G->color[order[i]] == color) {
+        for (link t = G->ladj[order[i]]; t != G->z; t = t->next) {
+          if (G->color[t->index] == 0) {
+            degree_copy[t->index]--;
+          }
+        }
+      }
+    }
+
+    color++; 
+  }
+
+  free(order); 
+  free(degree_copy); 
   return G->color;
 }
-
-
 
 /* Паралльная расскраска Джонса-Плассмана*/
 void jp_color_vertex(Graph G, unsigned int index, unsigned int n_threads,
                      unsigned int *weights) {
-  unsigned int n = G->V; // Количество вершин в графе
+  unsigned int n = G->V; 
   int uncolored = n / n_threads; // Количество вершин, которые должныы быть обработанны в этом потоке
   if (n % n_threads && (index < n % n_threads)) {
     uncolored++;  // это нужно для управления графами с количеством вершин
@@ -763,6 +742,7 @@ unsigned int *GRAPH_color(Graph G, char *coloring_method_str,
       break;
     case rec_rlf:
       return color_rlf(G);
+      GRAPH_ladj_print_with_colors(G, G->color);
       break;
     case par_jp:
       return color_parallel_jp(G, n_threads);
