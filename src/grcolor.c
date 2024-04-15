@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
   }
 
   char *coloring_methods[N_COLORING_METHODS] = {
-      "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_ex", "color_ex_edg"};
+      "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_op", "color_ex_edg"};
 
   Results res;  // struct to hold the results of a coloring (in terms of time
                 // and colors used, not the coloring itself)
