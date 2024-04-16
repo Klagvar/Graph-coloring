@@ -6,11 +6,11 @@ typedef enum {
   seq_ldf,
   rec_rlf,
   par_jp,
-  color_op,
-  color_ex_edg
+  color_op_ver,
+  color_op_ed
 } coloring_method;
 const char *coloring_methods[N_COLORING_METHODS] = {
-    "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_op", "color_ex_edg"};
+    "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_op_ver", "color_op_ed"};
 
 typedef struct node *link;
 
@@ -303,51 +303,86 @@ unsigned int *color_parallel_jp(Graph G, unsigned int n_threads) {
 
 /* Оптимизация расскраски */
 /* Оптимизация расскраски для вершин */
-unsigned int *color_optimize(Graph G) {
+
+// Раскраска графа для оптимизации расскраски
+void color_for_optimize(Graph G, unsigned int current_colors) {
+  unsigned int n = G->V;
+  for (unsigned int i = 0; i < n; i++) {
+    // Initialize color counts array
+    unsigned int *color_counts = malloc(current_colors * sizeof(unsigned int));
+    for (unsigned int j = 0; j < current_colors; j++) {
+      color_counts[j] = 0;
+    }
+
+    // Count each color among neighbors
+    for (link t = G->ladj[i]; t != G->z; t = t->next) {
+      if (G->color[t->index] != 0) { // If neighbor already has a color
+        color_counts[G->color[t->index] - 1]++;
+      }
+    }
+
+    // Find color with least repetitions
+    unsigned int min_color = 0;
+    for (unsigned int j = 1; j < current_colors; j++) {
+      if (color_counts[j] < color_counts[min_color]) {
+        min_color = j;
+      }
+    }
+
+    // Color the vertex in the found color
+    G->color[i] = min_color + 1;
+
+    free(color_counts);
+  }
+}
+
+// Перекраска лучшей вершины
+void best_vertex_color(Graph G, unsigned int current_colors, int best_vertex) {
+  // Инициализируем массив подсчета цветов
+  unsigned int *color_counts = malloc(current_colors * sizeof(unsigned int));
+  for (unsigned int i = 0; i < current_colors; i++) {
+    color_counts[i] = 0;
+  }
+
+  // Подсчитываем количество каждого цвета среди соседей
+  for (link t = G->ladj[best_vertex]; t != G->z; t = t->next) {
+    color_counts[G->color[t->index] - 1]++;
+  }
+
+  /*
+  for (unsigned int i = 0; i < current_colors; i++) {
+    printf("Color %d: %d\n", i + 1, color_counts[i]);
+  }*/
+
+  // Находим цвет с наименьшим количеством повторений
+  unsigned int min_color = 0;
+  for (unsigned int i = 1; i < current_colors; i++) {
+    if (color_counts[i] < color_counts[min_color]) {
+      min_color = i;
+    }
+  }
+  // Меняем цвет вершины на найденный цвет
+  //printf("current color: %d\n", G->color[best_vertex]);
+  G->color[best_vertex] = min_color + 1;
+  //printf("Best vertex color: %d\n\n", G->color[best_vertex]);
+
+  // Освобождаем память
+  free(color_counts);
+}
+
+unsigned int *color_ver_optimize(Graph G) {
   unsigned int n = G->V;
   for (unsigned int i = 0; i < n; i++) {
     G->color[i] = 0;
   }
   unsigned int current_colors = 2;
   // Пока расскраска не будет валидна
-  while (!GRAPH_check_given_coloring_validity(G, G->color))
+  do
   {
     //printf("\n\nCurrent colors: %d\n", current_colors);
-    // Случайно расскрашиваем граф
-    /*
-    for (unsigned int i = 0; i < n; i++) {
-      G->color[i] = rand() % current_colors + 1;
-    }*/
     // Расскрашиваю граф в текущее количество цветов на подобии с жадной расскраской
-    for (unsigned int i = 0; i < n; i++) {
-      // Инициализируем массив подсчета цветов
-      unsigned int *color_counts = malloc(current_colors * sizeof(unsigned int));
-      for (unsigned int j = 0; j < current_colors; j++) {
-        color_counts[j] = 0;
-      }
-
-      // Подсчитываем количество каждого цвета среди соседей
-      for (link t = G->ladj[i]; t != G->z; t = t->next) {
-        if (G->color[t->index] != 0) { // Если у соседа уже есть цвет
-          color_counts[G->color[t->index] - 1]++;
-        }
-      }
-
-      // Находим цвет с наименьшим количеством повторений
-      unsigned int min_color = 0;
-      for (unsigned int j = 1; j < current_colors; j++) {
-        if (color_counts[j] < color_counts[min_color]) {
-          min_color = j;
-        }
-      }
-
-      // Раскрашиваем вершину в найденный цвет
-      G->color[i] = min_color + 1;
-
-      // Освобождаем память
-      free(color_counts);
-    }
-
+    color_for_optimize(G, current_colors);
+    
     int *proc = malloc(n * sizeof(int));
     for (unsigned int i = 0; i < n; i++) {
       proc[i] = 0;
@@ -374,129 +409,96 @@ unsigned int *color_optimize(Graph G) {
       if (best_vertex == -1) break;
       proc[best_vertex] = 1;
       //printf("Best vertex: %d\n", best_vertex);
-
-      // Инициализируем массив подсчета цветов
-      unsigned int *color_counts = malloc(current_colors * sizeof(unsigned int));
-      for (unsigned int i = 0; i < current_colors; i++) {
-        color_counts[i] = 0;
-      }
-
-      // Подсчитываем количество каждого цвета среди соседей
-      for (link t = G->ladj[best_vertex]; t != G->z; t = t->next) {
-        color_counts[G->color[t->index] - 1]++;
-      }
-      for (unsigned int i = 0; i < current_colors; i++) {
-        //printf("Color %d: %d\n", i + 1, color_counts[i]);
-      }
-      // Находим цвет с наименьшим количеством повторений
-      unsigned int min_color = 0;
-      for (unsigned int i = 1; i < current_colors; i++) {
-        if (color_counts[i] < color_counts[min_color]) {
-          min_color = i;
-        }
-      }
-
-      // Меняем цвет вершины на найденный цвет
-      //printf("current color: %d\n", G->color[best_vertex]);
-      G->color[best_vertex] = min_color + 1;
-      //printf("Best vertex color: %d\n\n", G->color[best_vertex]);
-
-      // Освобождаем память
-      free(color_counts);
+      best_vertex_color(G, current_colors, best_vertex);
     }
     free(proc);
     current_colors++;
-  }
+  } while (!GRAPH_check_given_coloring_validity(G, G->color));
+
   return G->color;
 }
 
 
-/* Обмен цветами по рёбрам */
-/* Алгоритм обмена цветами по рёбрам */
-unsigned int find_min_color(unsigned int *colors, unsigned int *neighbours_colors, unsigned int n_colors) {
-  unsigned int min_color = 1;
-  while (1) {
-    int is_valid = 1;
-    for (unsigned int i = 0; i < n_colors; i++) {
-      if (neighbours_colors[i] == min_color) {
-        is_valid = 0;
-        break;
-      }
-    }
-    if (is_valid) {
-      return min_color;
-    }
-    min_color++;
-  }
-}
-
-unsigned int *color_exchange_edges(Graph G) {
+/* Оптимизация расскраски для ребер */
+// Работает ооооооооооооооооооооооооооооочень долго
+unsigned int *color_ed_optimize(Graph G) {
   unsigned int n = G->V;
-  unsigned int max_degree = 0;
-  // Находим максимальную степень вершины
   for (unsigned int i = 0; i < n; i++) {
-    if (G->degree[i] > max_degree) {
-      max_degree = G->degree[i];
-    }
+    G->color[i] = 0;
   }
-  // Максимальное количество цветов равно максимальной степени вершины плюс 1
-  unsigned int max_colors = max_degree + 1;
-  unsigned int *colors = malloc(n * sizeof(unsigned int));
-  if (colors == NULL) {
-    printf("Error allocating colors array!\n");
-    return NULL;
-  }
-
-  // Инициализируем все вершины случайными цветами
-  for (unsigned int i = 0; i < n; i++) {
-    colors[i] = rand() % max_colors + 1;
-  }
-
-  int *processed = calloc(n, sizeof(int));
-  if (processed == NULL) {
-    printf("Error allocating processed array!\n");
-    free(colors);
-    return NULL;
-  }
-
-  // Проходим по рёбрам и перекрашиваем вершины рёбер
-  for (unsigned int i = 0; i < n; i++) {
-    //printf("Рассматриваем вершину %d\n", i);
-    for (link t = G->ladj[i]; t != G->z; t = t->next) {
-      unsigned int u = i;
-      unsigned int v = t->index;
-      unsigned int j = 0;
-      if (processed[u] != 1) {
-        unsigned int *neighbours_colors_u = malloc(G->degree[u] * sizeof(unsigned int));
-
-        for (link t_u = G->ladj[u]; t_u != G->z; t_u = t_u->next) {
-          neighbours_colors_u[j++] = colors[t_u->index];
-        }
-        colors[u] = find_min_color(colors, neighbours_colors_u, G->degree[u]);
-        //printf("Меняю цвет вершины %u на %u\n", u, colors[u]);
-        G->color[u] = colors[u]; // Сохраняем цвет вершины в G->color
-        processed[u] = 1;
-        free(neighbours_colors_u);
-      }
-
-      if (processed[v] != 1) {
-        unsigned int *neighbours_colors_v = malloc(G->degree[v] * sizeof(unsigned int));
-        j = 0;
-        for (link t_v = G->ladj[v]; t_v != G->z; t_v = t_v->next) {
-          neighbours_colors_v[j++] = colors[t_v->index];
-        }
-        colors[v] = find_min_color(colors, neighbours_colors_v, G->degree[v]);
-        //printf("Меняю цвет вершины %u на %u\n", v, colors[v]);
-        G->color[v] = colors[v]; // Сохраняем цвет вершины в G->color
-        processed[v] = 1;
-        free(neighbours_colors_v);
+  unsigned int current_colors = 2;
+  // Пока расскраска не будет валидна
+  do
+  {
+    //printf("\n\nCurrent colors: %d\n", current_colors);
+    // Расскрашиваю граф в текущее количество цветов на подобии с жадной расскраской
+    color_for_optimize(G, current_colors);
+    
+    int **proc_edges = malloc(n * sizeof(int *));
+    for (unsigned int i = 0; i < n; i++) {
+      proc_edges[i] = malloc(n * sizeof(int));
+      for (unsigned int j = 0; j < n; j++) {
+        proc_edges[i][j] = 0;
       }
     }
-    //printf("\n");
-  }
-  free(processed);
+
+    while(1)
+    {
+      int best_ed_v1 = -1;
+      int best_ed_v2 = -1;
+      unsigned int max_warn = 0;
+
+      // Выбираем ребро с максимальным количеством соседей с таким-же цветом
+      for (unsigned int i = 0; i < n; i++) {
+        unsigned int warn_v1 = 0;
+
+        // Если все рёбра данной вершины обработаны, то пропускаем вершину (работает медленней)
+        /*
+        unsigned int l = 1;
+        for (unsigned int j = 0; j < n; j++) {
+          if (!proc_edges[i][j]) l = 0;
+        }
+        if (l) continue;*/
+
+        //Подсчёт количества соседей с таким же цветом для первой вершины
+        for (link t = G->ladj[i]; t != G->z; t = t->next) {
+          if (G->color[i] == G->color[t->index]) {
+            warn_v1++;
+          }
+        }
+
+        //Подсчёт количества соседей с таким же цветом для каждого соседа. И поиск лучшего ребра
+        for (link t = G->ladj[i]; t != G->z; t = t->next) {
+          if(proc_edges[i][t->index]) continue;
+          unsigned int warn_v2 = 0;
+          for (link u = G->ladj[t->index]; u != G->z; u = u->next) {
+            if (G->color[t->index] == G->color[u->index]) {
+              warn_v2++;
+            }
+          }
+          if (warn_v1 + warn_v2 > max_warn) {
+            max_warn = warn_v1 + warn_v2;
+            best_ed_v1 = i;
+            best_ed_v2 = t->index;
+          }
+        }
+      }
+
+      // Перекрашиваем лучшее ребро
+      if (best_ed_v1 == -1 || best_ed_v2 == -1) break;
+      proc_edges[best_ed_v1][best_ed_v2] = 1;
+      proc_edges[best_ed_v2][best_ed_v1] = 1;
+      //printf("Best edge: %d  %d\n", best_ed_v1, best_ed_v2);
+      best_vertex_color(G, current_colors, best_ed_v1);
+      best_vertex_color(G, current_colors, best_ed_v2);
+    }
+    free(proc_edges);
+    current_colors++;
+  } while (!GRAPH_check_given_coloring_validity(G, G->color));
+
   return G->color;
 }
+
 
 /* EXPOSED FUNCTIONS */
 unsigned int GRAPH_check_given_coloring_validity(Graph G, unsigned int *colors) {
@@ -804,11 +806,11 @@ unsigned int *GRAPH_color(Graph G, char *coloring_method_str,
     case par_jp:
       return color_parallel_jp(G, n_threads);
       break;
-    case color_op:
-      return color_optimize(G);
+    case color_op_ver:
+      return color_ver_optimize(G);
       break;  
-    case color_ex_edg:
-      return color_exchange_edges(G);
+    case color_op_ed:
+      return color_ed_optimize(G);
       break;
     default:
       fprintf(stderr, "Passed coloring method '%s' is not valid!\n", coloring_method_str);
