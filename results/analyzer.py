@@ -50,9 +50,9 @@ if __name__ == '__main__':
     ax1.set_ylabel('Average coloring time in seconds')
     ax2.set_ylabel('Average colors used')
     ax1.set_title(
-        'Comparison of coloring algorithms over 36 different graphs')
+        'Comparison of coloring algorithms over 31 different graphs')
     ax2.set_title(
-        'Comparison of coloring algorithms over 36 different graphs (biased by outliers)')
+        'Comparison of coloring algorithms over 31 different graphs (biased by outliers)')
     ax1.set_yticks(range(0, int(max(ax1.get_yticks())-1)))
     ax1.set_xticklabels(x, rotation=50, ha='right')
     ax2.set_xticklabels(x, rotation=50, ha='right')
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     ax.set_xlabel('Graph name')
     ax.set_ylabel('Average colors used')
     ax.set_title(
-        'Comparison of coloring algorithms over 34 different graphs')
+        'Comparison of coloring algorithms over 31 different graphs')
     ax.set_xticklabels(x, rotation=50, ha='right')
     ax.tick_params(axis='x', labelsize=12)
     fig.tight_layout()
