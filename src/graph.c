@@ -447,15 +447,6 @@ unsigned int *color_ed_optimize(Graph G) {
         // Подсчёт ошибок для первой вершины
         unsigned int mist_v1 = count_mist(G, i);
 
-        // Если все рёбра данной вершины обработаны, то пропускаем вершину (работает медленней)
-        /*
-        unsigned int l = 1;
-        for (unsigned int j = 0; j < n; j++) {
-          if (!proc_edges[i][j]) l = 0;
-        }
-        if (l) continue;
-        */
-
         //Подсчёт количества соседей с таким же цветом для каждого соседа. И поиск лучшего ребра
         for (link t = G->ladj[i]; t != G->z; t = t->next) {
           // Если ребро уже было обработано пропускаем
