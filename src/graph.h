@@ -1,31 +1,30 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
+#include <vector>
+#include <memory>
+#include <string>
 
 #include "util.h"
 
-typedef struct edge {
+struct Edge {
   int from;
   int to;
-} Edge;
+};
 
-typedef struct graph *Graph;
+struct Graph;
 
-unsigned int GRAPH_get_edge_count(Graph G);
-unsigned int GRAPH_get_vertex_count(Graph G);
-Graph GRAPH_load_from_file(char *filename);
-Graph GRAPH_init(unsigned int V);
-void GRAPH_free(Graph G);
-void GRAPH_ladj_print(Graph G);
-void GRAPH_ladj_print_with_colors(Graph G, unsigned int *colors);
-unsigned int *GRAPH_color(Graph G, char *coloring_method_str, unsigned int n_threads);
-unsigned int *GRAPH_get_degrees(Graph G);
-unsigned int GRAPH_check_given_coloring_validity(Graph G, unsigned int *colors);
-unsigned int GRAPH_check_current_coloring_validity(Graph G);
-unsigned long GRAPH_compute_bytes(Graph G);
+unsigned int GRAPH_get_edge_count(std::shared_ptr<Graph> G);
+unsigned int GRAPH_get_vertex_count(std::shared_ptr<Graph> G);
+std::shared_ptr<Graph> GRAPH_load_from_file(std::string filename);
+std::shared_ptr<Graph> GRAPH_init(unsigned int V);
+void GRAPH_free(std::shared_ptr<Graph> G);
+void GRAPH_ladj_print(std::shared_ptr<Graph> G);
+void GRAPH_ladj_print_with_colors(std::shared_ptr<Graph> G, std::vector<unsigned int> &colors);
+std::vector<unsigned int> GRAPH_color(std::shared_ptr<Graph> G, std::string coloring_method_str, unsigned int n_threads);
+std::vector<unsigned int> GRAPH_get_degrees(std::shared_ptr<Graph> G);
+bool GRAPH_check_given_coloring_validity(std::shared_ptr<Graph> G, std::vector<unsigned int> &colors);
+bool GRAPH_check_current_coloring_validity(std::shared_ptr<Graph> G);
+unsigned long GRAPH_compute_bytes(std::shared_ptr<Graph> G);
 
-#endif
+#endif 
