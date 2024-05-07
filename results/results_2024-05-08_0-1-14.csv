@@ -1,0 +1,12 @@
+graph_name,vertex_count,coloring_method,n_threads,coloring_time,colors_used
+queen6_6.graph,36,seq_greedy,4,0.000099,9
+queen6_6.graph,36,seq_ldf,4,0.000077,9
+queen6_6.graph,36,rec_rlf,4,0.000215,9
+queen6_6.graph,36,par_jp,4,0.027898,10
+queen6_6.graph,36,color_op_ver,4,0.005204,9
+queen6_6.graph,36,color_op_ed,4,0.596181,8
+miles750.graph,128,seq_greedy,4,0.000497,34
+miles750.graph,128,seq_ldf,4,0.000518,32
+miles750.graph,128,rec_rlf,4,0.003432,33
+miles750.graph,128,par_jp,4,0.002348,33
+miles750.graph,128,color_op_ver,4,0.286271,33
