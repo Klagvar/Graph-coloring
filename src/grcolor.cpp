@@ -10,7 +10,7 @@
 #include "graph.h"
 #include "util.h"
 
-#define N_COLORING_METHODS 5
+#define N_COLORING_METHODS 1
 
 struct Results {
   std::string graph_name;
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
   }
 
   std::vector<std::string> coloring_methods = {
-      "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_op_ver"};
+      "par_jp"};
 
   Results res;  // struct to hold the results of a coloring (in terms of time
                 // and colors used, not the coloring itself)
@@ -135,10 +135,15 @@ int main(int argc, char *argv[]) {
     /* create the csv file where to export results */
     time_t t = time(NULL);
     struct tm now = *localtime(&t);
-    csv_filename = "results/results_" + std::to_string(now.tm_year + 1900) + "-" 
-                   + std::to_string(now.tm_mon + 1) + "-" + std::to_string(now.tm_mday) + "_" 
-                   + std::to_string(now.tm_hour) + "-" + std::to_string(now.tm_min) + "-" 
-                   + std::to_string(now.tm_sec) + ".csv";
+    std::ostringstream oss;
+    oss << "results/results_" 
+        << std::to_string(now.tm_year + 1900) << "-" 
+        << std::setw(2) << std::setfill('0') << std::to_string(now.tm_mon + 1) << "-" 
+        << std::setw(2) << std::setfill('0') << std::to_string(now.tm_mday) << "_" 
+        << std::to_string(now.tm_hour) << "-" 
+        << std::to_string(now.tm_min) << "-" 
+        << std::to_string(now.tm_sec) << ".csv";
+    csv_filename = oss.str();
     csv_file.open(csv_filename);
     if (!csv_file.is_open()) {
       std::cout << "Error opening " << csv_filename << "\n";

@@ -42,11 +42,13 @@ struct ParamStruct {
   std::mutex* lock;
   unsigned int n_threads;
 
-  ParamStruct() : lock(new std::mutex()) {}
+  ParamStruct(std::mutex* lock) : lock(lock) {}
 
   ParamStruct(std::shared_ptr<Graph> G, unsigned int n_threads, std::vector<unsigned int> weights, std::mutex* lock)
     : G(G), index(0), weights(weights), vertexes(std::vector<unsigned int>(G->V)), lock(lock), n_threads(n_threads) {}
 };
+
+
 
 
 /* UTILITY FUNCTIONS */
@@ -197,6 +199,7 @@ void jp_color_vertex(std::shared_ptr<Graph> G, unsigned int index, unsigned int 
     uncolored++;  // это нужно для управления графами с количеством вершин
                   // не кратным количеству потоков
   }
+  //std::cout << "Thread " << index << " is responsible for " << uncolored << " vertices." << std::endl;
   while (uncolored > 0) {
     for (unsigned int i = index; i < n; i += n_threads) {
       if (G->color[i] == 0) { // если вершина не раскрашена
@@ -222,28 +225,31 @@ void jp_color_vertex(std::shared_ptr<Graph> G, unsigned int index, unsigned int 
       }
     }
   }
+  //std::cout << "Thread " << index << " is processing vertices...\n";
 }
 
 void jp_color_vertex_wrapper(ParamStruct par) { // обёртка функции jp_color_vertex
   unsigned int index = par.index; // read the index
   par.lock->unlock(); // then unlock the mutex
+  //std::cout << "Thread " << par.index << " is starting...\n";
   jp_color_vertex(par.G, index, par.n_threads, par.weights);
+  
 }
 
 std::vector<unsigned int> color_parallel_jp(std::shared_ptr<Graph> G, unsigned int n_threads) {
   unsigned int n = G->V;
-  std::vector<unsigned int> weights(n); // выделение памяти для массива весов
+  std::vector<unsigned int> weights(n); // массив весов
   for (unsigned int i = 0; i < n; i++) { // Инициализация цветов и заполнение массива весов
     G->color[i] = 0;
     weights[i] = rand();
   }
   std::mutex mutex; // Позволяет синхронизировать доступ к массиву цветов
 
-  ParamStruct par; // структура для хранения необходимых параметров
-  par.G = G;
-  par.n_threads = n_threads;
-  par.weights = weights;
-  par.lock = &mutex;
+  ParamStruct par (G, n_threads, weights, &mutex); // структура для хранения необходимых параметров
+  //par.G = G;
+  //par.n_threads = n_threads;
+  //par.weights = weights;
+  //par.lock = &mutex;
   std::vector<std::thread> threads(n_threads); // выделение памяти для массива потоков
 
   for (unsigned int i = 0; i < n_threads; i++) { // Инициализация массива потоков
@@ -255,7 +261,7 @@ std::vector<unsigned int> color_parallel_jp(std::shared_ptr<Graph> G, unsigned i
   for (auto &thread : threads) {
     thread.join();
   }
-
+  
   return G->color;
 }
 
