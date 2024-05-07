@@ -10,7 +10,7 @@
 #include "graph.h"
 #include "util.h"
 
-#define N_COLORING_METHODS 1
+#define N_COLORING_METHODS 5
 
 struct Results {
   std::string graph_name;
@@ -124,8 +124,7 @@ int main(int argc, char *argv[]) {
     n_threads = get_nprocs();
   }
 
-  std::vector<std::string> coloring_methods = {
-      "par_jp"};
+  std::vector<std::string> coloring_methods = { "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_op_ver"/*, "color_op_ed"*/};
 
   Results res;  // struct to hold the results of a coloring (in terms of time
                 // and colors used, not the coloring itself)
@@ -222,7 +221,7 @@ int main(int argc, char *argv[]) {
             res.colors_used = UTIL_max_in_array(colors);
             res.coloring_time = finish - start;
             std::cout << std::setw(16) << res.coloring_method << " | "
-                      << std::setw(11) << res.coloring_time << " | "
+                      << std::fixed << std::setw(11) << res.coloring_time << " | "
                       << std::setw(11) << res.colors_used << " | ";
 
             /* check whether or not the produced coloring is valid */
@@ -237,7 +236,7 @@ int main(int argc, char *argv[]) {
                 } else {
                   csv_file << res.graph_name << "," << res.vertex_count << ","
                            << res.coloring_method << "," << res.n_threads << ","
-                           << res.coloring_time << "," << res.colors_used << "\n";
+                           << std::fixed << res.coloring_time << "," << res.colors_used << "\n";
                   csv_file.close();
                 }
               }

@@ -83,17 +83,17 @@ static std::shared_ptr<Node> EDGE_insert(std::shared_ptr<Graph> G, int from, int
 std::vector<unsigned int> color_sequential_greedy(std::shared_ptr<Graph> G) {
   unsigned int n = G->V; 
   std::vector<unsigned int> random_order(n); 
-  for (unsigned int i = 0; i < n; i++) { // Инициализируем массив случайного порядка и массив цветов.
+  for (unsigned int i = 0; i < n; i++) { // Инициализируем вектора случайного порядка и вектор цветов.
     G->color[i] = 0;
     random_order[i] = i;
   }
-  UTIL_randomize_array(random_order); // Случайно перемешаем массив.
+  UTIL_randomize_array(random_order); // Случайно перемешаем вектор
   for (unsigned int i = 0; i < n; i++) {
     unsigned int ii = random_order[i];
 
-    std::vector<int> neighbours_colors(G->degree[ii]); // Выделяем память для цветов каждого соседа
+    std::vector<int> neighbours_colors(G->degree[ii]); // Вектор цветов каждого соседа
     unsigned int j = 0;
-    for (auto t = G->ladj[ii]; t != G->z; t = t->next) { // Инициализируем массив цветов каждого соседа
+    for (auto t = G->ladj[ii]; t != G->z; t = t->next) { // Инициализируем вектор цветов каждого соседа
       neighbours_colors[j++] = G->color[t->index];
     }
 
@@ -108,7 +108,7 @@ std::vector<unsigned int> color_sequential_ldf(std::shared_ptr<Graph> G) {
   unsigned int n = G->V; 
   std::vector<unsigned int> degree(n); 
   std::vector<unsigned int> vertex(n); 
-  for (unsigned int i = 0; i < n; i++) { // Заполнение массивов степеней, номеров вершин и цветов 0 для всех вершин
+  for (unsigned int i = 0; i < n; i++) { // Заполнение векторов степеней, номеров вершин и цветов 0 для всех вершин
     G->color[i] = 0;
     degree[i] = G->degree[i];
     vertex[i] = i;
@@ -117,9 +117,9 @@ std::vector<unsigned int> color_sequential_ldf(std::shared_ptr<Graph> G) {
   for (int i = n - 1; i >= 0; i--) {
     unsigned int ii = vertex[i];  // Сортировка кучей сортирует степени в порядке возрастания,
                                   // поэтому мы получаем к ним доступ в обратном порядке.
-    std::vector<int> neighbours_colors(degree[i]); // Выделение памяти для массива цветов соседей
+    std::vector<int> neighbours_colors(degree[i]); // Выделение памяти для вектора цветов соседей
     unsigned int j = 0;
-    for (auto t = G->ladj[ii]; t != G->z; t = t->next) { // Заполнение массива цветов соседей
+    for (auto t = G->ladj[ii]; t != G->z; t = t->next) { // Заполнение вектора цветов соседей
       neighbours_colors[j++] = G->color[t->index];
     }
 
@@ -133,7 +133,7 @@ std::vector<unsigned int> color_rlf(std::shared_ptr<Graph> G) {
   unsigned int n = G->V; 
   std::vector<unsigned int> order(n); 
   std::vector<unsigned int> degree_copy(n); 
-  for (unsigned int i = 0; i < n; i++) { // Инициализируем массив порядка, массив цветов и копию степеней вершин.
+  for (unsigned int i = 0; i < n; i++) { // Инициализируем вектор порядка, вектор цветов и копию степеней вершин.
     G->color[i] = 0;
     order[i] = i;
     degree_copy[i] = G->degree[i];
@@ -199,14 +199,13 @@ void jp_color_vertex(std::shared_ptr<Graph> G, unsigned int index, unsigned int 
     uncolored++;  // это нужно для управления графами с количеством вершин
                   // не кратным количеству потоков
   }
-  //std::cout << "Thread " << index << " is responsible for " << uncolored << " vertices." << std::endl;
   while (uncolored > 0) {
     for (unsigned int i = index; i < n; i += n_threads) {
       if (G->color[i] == 0) { // если вершина не раскрашена
         std::vector<int> neighbours_colors(G->degree[i]); 
         unsigned int has_highest_number = 1;
         unsigned int j = 0;
-        for (auto t = G->ladj[i]; t != G->z; t = t->next) { // Заполнение массива цветов соседей
+        for (auto t = G->ladj[i]; t != G->z; t = t->next) { // Заполнение вектора цветов соседей
           if (G->color[t->index] == 0 &&
               (weights[t->index] > weights[i] ||
                (weights[t->index] == weights[i] && (unsigned int)t->index > i))) {
@@ -225,34 +224,29 @@ void jp_color_vertex(std::shared_ptr<Graph> G, unsigned int index, unsigned int 
       }
     }
   }
-  //std::cout << "Thread " << index << " is processing vertices...\n";
 }
 
 void jp_color_vertex_wrapper(ParamStruct par) { // обёртка функции jp_color_vertex
   unsigned int index = par.index; // read the index
   par.lock->unlock(); // then unlock the mutex
-  //std::cout << "Thread " << par.index << " is starting...\n";
   jp_color_vertex(par.G, index, par.n_threads, par.weights);
   
 }
 
 std::vector<unsigned int> color_parallel_jp(std::shared_ptr<Graph> G, unsigned int n_threads) {
   unsigned int n = G->V;
-  std::vector<unsigned int> weights(n); // массив весов
-  for (unsigned int i = 0; i < n; i++) { // Инициализация цветов и заполнение массива весов
+  std::vector<unsigned int> weights(n); // вектор весов
+  for (unsigned int i = 0; i < n; i++) { // Инициализация цветов и заполнение вектора весов
     G->color[i] = 0;
     weights[i] = rand();
   }
-  std::mutex mutex; // Позволяет синхронизировать доступ к массиву цветов
+  std::mutex mutex; // Позволяет синхронизировать доступ к вектору цветов
 
   ParamStruct par (G, n_threads, weights, &mutex); // структура для хранения необходимых параметров
-  //par.G = G;
-  //par.n_threads = n_threads;
-  //par.weights = weights;
-  //par.lock = &mutex;
-  std::vector<std::thread> threads(n_threads); // выделение памяти для массива потоков
 
-  for (unsigned int i = 0; i < n_threads; i++) { // Инициализация массива потоков
+  std::vector<std::thread> threads(n_threads); // выделение памяти для вектора потоков
+
+  for (unsigned int i = 0; i < n_threads; i++) { // Инициализация вектора потоков
     par.lock->lock(); // lock the mutex or wait until it is unlocked
     par.index = i; // assign i
     threads[i] = std::thread(jp_color_vertex_wrapper, par); // запуск потока
@@ -261,7 +255,6 @@ std::vector<unsigned int> color_parallel_jp(std::shared_ptr<Graph> G, unsigned i
   for (auto &thread : threads) {
     thread.join();
   }
-  
   return G->color;
 }
 
@@ -271,7 +264,7 @@ std::vector<unsigned int> color_parallel_jp(std::shared_ptr<Graph> G, unsigned i
 void color_for_optimize(std::shared_ptr<Graph> G, unsigned int current_colors) {
   unsigned int n = G->V;
   for (unsigned int i = 0; i < n; i++) {
-    // Инициализируем массив подсчета цветов
+    // Инициализируем вектор подсчета цветов
     std::vector<unsigned int> color_counts(current_colors, 0);
     // Подсчитываем количество каждого цвета среди соседей
     for (auto t = G->ladj[i]; t != G->z; t = t->next) {
@@ -293,7 +286,7 @@ void color_for_optimize(std::shared_ptr<Graph> G, unsigned int current_colors) {
 
 // Перекраска лучшей вершины
 void best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_colors, int best_vertex) {
-  // Инициализируем массив подсчета цветов
+  // Инициализируем вектор подсчета цветов
   std::vector<unsigned int> color_counts(current_colors, 0);
   // Подсчитываем количество каждого цвета среди соседей
   for (auto t = G->ladj[best_vertex]; t != G->z; t = t->next) {
@@ -334,7 +327,7 @@ std::vector<unsigned int> color_ver_optimize(std::shared_ptr<Graph> G) {
     // Расскрашиваю граф в текущее количество цветов на подобии с жадной расскраской
     color_for_optimize(G, current_colors);
     
-    std::vector<int> proc(n, 0); // Массив для отслеживания уже обработанных вершин
+    std::vector<int> proc(n, 0); // вектор для отслеживания уже обработанных вершин
 
     while(1)
     {
@@ -378,7 +371,7 @@ std::vector<unsigned int> color_ed_optimize(std::shared_ptr<Graph> G) {
     // Расскрашиваю граф в текущее количество цветов на подобии с жадной расскраской
     color_for_optimize(G, current_colors);
     
-    // Квадратный массив для поиска уже обработанных рёбер
+    // Квадратный вектор для поиска уже обработанных рёбер
     std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
 
     while(1)
