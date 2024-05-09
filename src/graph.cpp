@@ -288,13 +288,15 @@ void color_for_optimize(std::shared_ptr<Graph> G, unsigned int current_colors) {
 }
 
 // Перекраска лучшей вершины
-void best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_colors, int best_vertex) {
+unsigned int best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_colors, int best_vertex) {
   // Инициализируем вектор подсчета цветов
   std::vector<unsigned int> color_counts(current_colors, 0);
+  
   // Подсчитываем количество каждого цвета среди соседей
   for (auto t = G->ladj[best_vertex]; t != G->z; t = t->next) {
     color_counts[G->color[t->index] - 1]++;
   }
+  
   // Выбор цвета с наименьшим количеством повторений
   unsigned int min_color = 0;
   for (unsigned int i = 1; i < current_colors; i++) {
@@ -302,9 +304,31 @@ void best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_colors, in
       min_color = i;
     }
   }
-  // Раскрашиваем вершину в оптимальный цвет
-  G->color[best_vertex] = min_color + 1;
+  // Проверяем, есть ли соседи с таким же цветом
+  int has_same_color_neighbors = 0;
+  for (unsigned int i = 0; i < current_colors; i++) {
+    if (color_counts[i] > 0) {
+      has_same_color_neighbors = 1;
+      break;
+    }
+  }
+  // Если есть соседи с таким же цветом, перекрашиваем вершину
+  if (has_same_color_neighbors) {
+    G->color[best_vertex] = min_color + 1;
+  }
+  
+  // Подсчитываем количество ошибок после перекраски
+  int errors = 0;
+  for (auto t = G->ladj[best_vertex]; t != G->z; t = t->next) {
+    if (G->color[t->index] == G->color[best_vertex]) {
+      errors++;
+    }
+  }
+  
+  // Возвращаем количество ошибок
+  return errors;
 }
+
 
 // Подсчёт количества ошибок (соседей с таким-же цветом)
 unsigned int count_mist(std::shared_ptr<Graph> G, int v) {
@@ -345,29 +369,40 @@ std::vector<unsigned int> color_ver_optimize_parallel(std::shared_ptr<Graph> G, 
     G->color[i] = 0;
   }
   unsigned int current_colors = 2;
-  std::vector<int> proc(n, 0);
+  //std::vector<int> proc(n, 0);
   std::mutex mutex;
   do {
     color_for_optimize(G, current_colors);
-    while (1) {
-      unsigned int best_vertex = -1;
-      unsigned int max_mist = 0;
-      std::vector<std::thread> threads(n_threads);
-      unsigned int chunk_size = n / n_threads;
-      for (unsigned int i = 0; i < n_threads; i++) {
-        unsigned int start = i * chunk_size;
-        unsigned int end = (i == n_threads - 1) ? n : start + chunk_size;
-        threads[i] = std::thread(find_best_vertex_thread, G, start, end, std::ref(best_vertex), std::ref(max_mist), std::ref(proc), std::ref(mutex));
+
+    unsigned int prev_mist = UINT_MAX;
+    unsigned int cur_mist = UINT_MAX - 1;
+
+    while(cur_mist < prev_mist) {
+      std::vector<int> proc(n, 0);
+      prev_mist = cur_mist;
+      cur_mist = 0;
+      
+      while (1) {
+        unsigned int best_vertex = -1;
+        unsigned int max_mist = 0;
+        std::vector<std::thread> threads(n_threads);
+        unsigned int chunk_size = n / n_threads;
+        for (unsigned int i = 0; i < n_threads; i++) {
+          unsigned int start = i * chunk_size;
+          unsigned int end = (i == n_threads - 1) ? n : start + chunk_size;
+          threads[i] = std::thread(find_best_vertex_thread, G, start, end, std::ref(best_vertex), std::ref(max_mist), std::ref(proc), std::ref(mutex));
+        }
+        for (auto &thread : threads) {
+          thread.join();
+        }
+        if (best_vertex == UINT_MAX) break;
+        proc[best_vertex] = 1;
+        cur_mist += best_vertex_color(G, current_colors, best_vertex);
       }
-      for (auto &thread : threads) {
-        thread.join();
-      }
-      if (best_vertex == UINT_MAX) break;
-      proc[best_vertex] = 1;
-      best_vertex_color(G, current_colors, best_vertex);
     }
     current_colors++;
   } while (!GRAPH_check_given_coloring_validity(G, G->color));
+
   return G->color;
 }
 
@@ -406,29 +441,37 @@ std::vector<unsigned int> color_ed_optimize_parallel(std::shared_ptr<Graph> G, u
     G->color[i] = 0;
   }
   unsigned int current_colors = 2;
-  std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
+  // std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
   std::mutex mutex;
   do {
     color_for_optimize(G, current_colors);
-    while (1) {
-      int best_ed_v1 = -1;
-      int best_ed_v2 = -1;
-      unsigned int max_mist = 0;
-      std::vector<std::thread> threads(n_threads);
-      unsigned int chunk_size = n / n_threads;
-      for (unsigned int i = 0; i < n_threads; i++) {
-        unsigned int start = i * chunk_size;
-        unsigned int end = (i == n_threads - 1) ? n : start + chunk_size;
-        threads[i] = std::thread(find_best_edge_thread, G, start, end, std::ref(best_ed_v1), std::ref(best_ed_v2), std::ref(max_mist), std::ref(proc_edges), std::ref(mutex));
+
+    unsigned int prev_mist = UINT_MAX;
+    unsigned int cur_mist = UINT_MAX - 1;
+    while(cur_mist < prev_mist) {
+      std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
+      prev_mist = cur_mist;
+      cur_mist = 0;
+      while (1) {
+        int best_ed_v1 = -1;
+        int best_ed_v2 = -1;
+        unsigned int max_mist = 0;
+        std::vector<std::thread> threads(n_threads);
+        unsigned int chunk_size = n / n_threads;
+        for (unsigned int i = 0; i < n_threads; i++) {
+          unsigned int start = i * chunk_size;
+          unsigned int end = (i == n_threads - 1) ? n : start + chunk_size;
+          threads[i] = std::thread(find_best_edge_thread, G, start, end, std::ref(best_ed_v1), std::ref(best_ed_v2), std::ref(max_mist), std::ref(proc_edges), std::ref(mutex));
+        }
+        for (auto &thread : threads) {
+          thread.join();
+        }
+        if (best_ed_v1 == -1 || best_ed_v2 == -1) break;
+        proc_edges[best_ed_v1][best_ed_v2] = 1;
+        proc_edges[best_ed_v2][best_ed_v1] = 1;
+        cur_mist += best_vertex_color(G, current_colors, best_ed_v1);
+        cur_mist += best_vertex_color(G, current_colors, best_ed_v2);
       }
-      for (auto &thread : threads) {
-        thread.join();
-      }
-      if (best_ed_v1 == -1 || best_ed_v2 == -1) break;
-      proc_edges[best_ed_v1][best_ed_v2] = 1;
-      proc_edges[best_ed_v2][best_ed_v1] = 1;
-      best_vertex_color(G, current_colors, best_ed_v1);
-      best_vertex_color(G, current_colors, best_ed_v2);
     }
     current_colors++;
   } while (!GRAPH_check_given_coloring_validity(G, G->color));
