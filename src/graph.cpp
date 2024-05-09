@@ -7,6 +7,9 @@
 #include <sstream>
 #include <thread>
 #include <iostream>
+#include <climits>
+
+
 
 #define N_COLORING_METHODS 6
 enum ColoringMethod {
@@ -314,93 +317,114 @@ unsigned int count_mist(std::shared_ptr<Graph> G, int v) {
   return mist;
 }
 
-/* Оптимизация расскраски для вершин */
-std::vector<unsigned int> color_ver_optimize(std::shared_ptr<Graph> G) {
+// Функция для поиска лучшей вершины в каждом потоке
+void find_best_vertex_thread(std::shared_ptr<Graph> G, unsigned int start, unsigned int end, unsigned int &best_vertex, unsigned int &max_mist, std::vector<int> &proc, std::mutex &mutex) {
+  unsigned int local_best_vertex = -1;
+  unsigned int local_max_mist = 0;
+  for (unsigned int i = start; i < end; i++) {
+    if (proc[i]) continue;
+    unsigned int mist = count_mist(G, i);
+    if (mist > local_max_mist) {
+      local_max_mist = mist;
+      local_best_vertex = i;
+    }
+  }
+  // Обновляем глобальные значения, если локальные значения лучше
+  std::lock_guard<std::mutex> lock(mutex);
+  if (local_max_mist > max_mist) {
+    //std::cout << "local_max_mist = " << local_max_mist << ", local_best_vertex = " << local_best_vertex << std::endl;
+    max_mist = local_max_mist;
+    best_vertex = local_best_vertex;
+  }
+}
+
+// Измененная функция color_ver_optimize
+std::vector<unsigned int> color_ver_optimize_parallel(std::shared_ptr<Graph> G, unsigned int n_threads) {
   unsigned int n = G->V;
   for (unsigned int i = 0; i < n; i++) {
     G->color[i] = 0;
   }
   unsigned int current_colors = 2;
-  // Пока расскраска не будет валидна
-  do
-  {
-    // Расскрашиваю граф в текущее количество цветов на подобии с жадной расскраской
+  std::vector<int> proc(n, 0);
+  std::mutex mutex;
+  do {
     color_for_optimize(G, current_colors);
-    
-    std::vector<int> proc(n, 0); // вектор для отслеживания уже обработанных вершин
-
-    while(1)
-    {
-      int best_vertex = -1;
+    while (1) {
+      unsigned int best_vertex = -1;
       unsigned int max_mist = 0;
-      // Выбираем вершину с максимальным количеством соседей с таким-же цветом
-      for (unsigned int i = 0; i < n; i++) {
-        // Если вершина уже была перекрашена пропускаем
-        if (proc[i]) continue; 
-
-        unsigned int mist = count_mist(G, i);
-        if (mist > max_mist) {
-          max_mist = mist;
-          best_vertex = i;
-        }
+      std::vector<std::thread> threads(n_threads);
+      unsigned int chunk_size = n / n_threads;
+      for (unsigned int i = 0; i < n_threads; i++) {
+        unsigned int start = i * chunk_size;
+        unsigned int end = (i == n_threads - 1) ? n : start + chunk_size;
+        threads[i] = std::thread(find_best_vertex_thread, G, start, end, std::ref(best_vertex), std::ref(max_mist), std::ref(proc), std::ref(mutex));
       }
-      // Если не нашли лучшую вершину для перекраски выходим из цикла
-      if (best_vertex == -1) break; 
-
-      //Отмечаем вершиу как обработанную и перекрашиваем
+      for (auto &thread : threads) {
+        thread.join();
+      }
+      if (best_vertex == UINT_MAX) break;
       proc[best_vertex] = 1;
       best_vertex_color(G, current_colors, best_vertex);
     }
     current_colors++;
   } while (!GRAPH_check_given_coloring_validity(G, G->color));
-
   return G->color;
 }
 
 
+
 /* Оптимизация расскраски для ребер */
-std::vector<unsigned int> color_ed_optimize(std::shared_ptr<Graph> G) {
+// Функция для поиска лучшего ребра в каждом потоке
+void find_best_edge_thread(std::shared_ptr<Graph> G, unsigned int start, unsigned int end, int &best_ed_v1, int &best_ed_v2, unsigned int &max_mist, std::vector<std::vector<int>> &proc_edges, std::mutex &mutex) {
+  int local_best_ed_v1 = -1;
+  int local_best_ed_v2 = -1;
+  unsigned int local_max_mist = 0;
+  for (unsigned int i = start; i < end; i++) {
+    unsigned int mist_v1 = count_mist(G, i);
+    for (auto t = G->ladj[i]; t != G->z; t = t->next) {
+      if(proc_edges[i][t->index]) continue;
+      unsigned int mist_v2 = count_mist(G, t->index);
+      if (mist_v1 + mist_v2 > local_max_mist) {
+        local_max_mist = mist_v1 + mist_v2;
+        local_best_ed_v1 = i;
+        local_best_ed_v2 = t->index;
+      }
+    }
+  }
+  std::lock_guard<std::mutex> lock(mutex);
+  if (local_max_mist > max_mist) {
+    max_mist = local_max_mist;
+    best_ed_v1 = local_best_ed_v1;
+    best_ed_v2 = local_best_ed_v2;
+  }
+}
+
+// Измененная функция color_ed_optimize
+std::vector<unsigned int> color_ed_optimize_parallel(std::shared_ptr<Graph> G, unsigned int n_threads) {
   unsigned int n = G->V;
   for (unsigned int i = 0; i < n; i++) {
     G->color[i] = 0;
   }
   unsigned int current_colors = 2;
-  // Пока расскраска не будет валидна
-  do
-  {
-    // Расскрашиваю граф в текущее количество цветов на подобии с жадной расскраской
+  std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
+  std::mutex mutex;
+  do {
     color_for_optimize(G, current_colors);
-    
-    // Квадратный вектор для поиска уже обработанных рёбер
-    std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
-
-    while(1)
-    {
+    while (1) {
       int best_ed_v1 = -1;
       int best_ed_v2 = -1;
       unsigned int max_mist = 0;
-
-      // Выбираем ребро с максимальным количеством соседей с таким-же цветом
-      for (unsigned int i = 0; i < n; i++) {
-        // Подсчёт ошибок для первой вершины
-        unsigned int mist_v1 = count_mist(G, i);
-
-        //Подсчёт количества соседей с таким же цветом для каждого соседа. И поиск лучшего ребра
-        for (auto t = G->ladj[i]; t != G->z; t = t->next) {
-          // Если ребро уже было обработано пропускаем
-          if(proc_edges[i][t->index]) continue;
-          unsigned int mist_v2 = count_mist(G, t->index);
-          if (mist_v1 + mist_v2 > max_mist) {
-            max_mist = mist_v1 + mist_v2;
-            best_ed_v1 = i;
-            best_ed_v2 = t->index;
-          }
-        }
+      std::vector<std::thread> threads(n_threads);
+      unsigned int chunk_size = n / n_threads;
+      for (unsigned int i = 0; i < n_threads; i++) {
+        unsigned int start = i * chunk_size;
+        unsigned int end = (i == n_threads - 1) ? n : start + chunk_size;
+        threads[i] = std::thread(find_best_edge_thread, G, start, end, std::ref(best_ed_v1), std::ref(best_ed_v2), std::ref(max_mist), std::ref(proc_edges), std::ref(mutex));
       }
-
-      // Если не нашли лучшего ребра, выходим из цикла
+      for (auto &thread : threads) {
+        thread.join();
+      }
       if (best_ed_v1 == -1 || best_ed_v2 == -1) break;
-      // Перекрашиваем лучшее ребро
       proc_edges[best_ed_v1][best_ed_v2] = 1;
       proc_edges[best_ed_v2][best_ed_v1] = 1;
       best_vertex_color(G, current_colors, best_ed_v1);
@@ -408,9 +432,9 @@ std::vector<unsigned int> color_ed_optimize(std::shared_ptr<Graph> G) {
     }
     current_colors++;
   } while (!GRAPH_check_given_coloring_validity(G, G->color));
-
   return G->color;
 }
+
 
 /* EXPOSED FUNCTIONS */
 bool GRAPH_check_given_coloring_validity(std::shared_ptr<Graph> G, std::vector<unsigned int> &colors) {
@@ -657,10 +681,10 @@ std::vector<unsigned int> GRAPH_color(std::shared_ptr<Graph> G, std::string colo
       return color_parallel_jp(G, n_threads);
       break;
     case color_op_ver:
-      return color_ver_optimize(G);
+      return color_ver_optimize_parallel(G, n_threads);
       break;  
     case color_op_ed:
-      return color_ed_optimize(G);
+      return color_ed_optimize_parallel(G, n_threads);
       break;
     default:
       std::cerr << "Passed coloring method '" << coloring_method_str << "' is not valid!\n";
