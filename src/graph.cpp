@@ -287,11 +287,10 @@ void color_for_optimize(std::shared_ptr<Graph> G, unsigned int current_colors) {
   }
 }
 
-// Перекраска лучшей вершины
+// Перекраска лучшей вершины и возврат количества ошибок после перекраски
 unsigned int best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_colors, int best_vertex) {
   // Инициализируем вектор подсчета цветов
   std::vector<unsigned int> color_counts(current_colors, 0);
-  
   // Подсчитываем количество каждого цвета среди соседей
   for (auto t = G->ladj[best_vertex]; t != G->z; t = t->next) {
     color_counts[G->color[t->index] - 1]++;
@@ -304,18 +303,8 @@ unsigned int best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_co
       min_color = i;
     }
   }
-  // Проверяем, есть ли соседи с таким же цветом
-  int has_same_color_neighbors = 0;
-  for (unsigned int i = 0; i < current_colors; i++) {
-    if (color_counts[i] > 0) {
-      has_same_color_neighbors = 1;
-      break;
-    }
-  }
-  // Если есть соседи с таким же цветом, перекрашиваем вершину
-  if (has_same_color_neighbors) {
-    G->color[best_vertex] = min_color + 1;
-  }
+
+  G->color[best_vertex] = min_color + 1;
   
   // Подсчитываем количество ошибок после перекраски
   int errors = 0;
@@ -324,11 +313,8 @@ unsigned int best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_co
       errors++;
     }
   }
-  
-  // Возвращаем количество ошибок
   return errors;
 }
-
 
 // Подсчёт количества ошибок (соседей с таким-же цветом)
 unsigned int count_mist(std::shared_ptr<Graph> G, int v) {
@@ -342,8 +328,8 @@ unsigned int count_mist(std::shared_ptr<Graph> G, int v) {
 }
 
 // Функция для поиска лучшей вершины в каждом потоке
-void find_best_vertex_thread(std::shared_ptr<Graph> G, unsigned int start, unsigned int end, unsigned int &best_vertex, unsigned int &max_mist, std::vector<int> &proc, std::mutex &mutex) {
-  unsigned int local_best_vertex = -1;
+void find_best_vertex_thread(std::shared_ptr<Graph> G, unsigned int start, unsigned int end, int &best_vertex, unsigned int &max_mist, std::vector<int> &proc, std::mutex &mutex) {
+  int local_best_vertex = -1;
   unsigned int local_max_mist = 0;
   for (unsigned int i = start; i < end; i++) {
     if (proc[i]) continue;
@@ -353,10 +339,10 @@ void find_best_vertex_thread(std::shared_ptr<Graph> G, unsigned int start, unsig
       local_best_vertex = i;
     }
   }
+
   // Обновляем глобальные значения, если локальные значения лучше
   std::lock_guard<std::mutex> lock(mutex);
   if (local_max_mist > max_mist) {
-    //std::cout << "local_max_mist = " << local_max_mist << ", local_best_vertex = " << local_best_vertex << std::endl;
     max_mist = local_max_mist;
     best_vertex = local_best_vertex;
   }
@@ -369,7 +355,6 @@ std::vector<unsigned int> color_ver_optimize_parallel(std::shared_ptr<Graph> G, 
     G->color[i] = 0;
   }
   unsigned int current_colors = 2;
-  //std::vector<int> proc(n, 0);
   std::mutex mutex;
   do {
     color_for_optimize(G, current_colors);
@@ -383,7 +368,7 @@ std::vector<unsigned int> color_ver_optimize_parallel(std::shared_ptr<Graph> G, 
       cur_mist = 0;
       
       while (1) {
-        unsigned int best_vertex = -1;
+        int best_vertex = -1;
         unsigned int max_mist = 0;
         std::vector<std::thread> threads(n_threads);
         unsigned int chunk_size = n / n_threads;
@@ -395,7 +380,7 @@ std::vector<unsigned int> color_ver_optimize_parallel(std::shared_ptr<Graph> G, 
         for (auto &thread : threads) {
           thread.join();
         }
-        if (best_vertex == UINT_MAX) break;
+        if (best_vertex == -1) break;
         proc[best_vertex] = 1;
         cur_mist += best_vertex_color(G, current_colors, best_vertex);
       }
@@ -405,7 +390,6 @@ std::vector<unsigned int> color_ver_optimize_parallel(std::shared_ptr<Graph> G, 
 
   return G->color;
 }
-
 
 
 /* Оптимизация расскраски для ребер */
@@ -441,7 +425,6 @@ std::vector<unsigned int> color_ed_optimize_parallel(std::shared_ptr<Graph> G, u
     G->color[i] = 0;
   }
   unsigned int current_colors = 2;
-  // std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
   std::mutex mutex;
   do {
     color_for_optimize(G, current_colors);

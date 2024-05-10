@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
     n_threads = get_nprocs();
   }
 
-  std::vector<std::string> coloring_methods = { "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_op_ver", "color_op_ed" };
+  std::vector<std::string> coloring_methods = { "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_op_ver", "color_op_ed"};
 
   Results res;  // struct to hold the results of a coloring (in terms of time
                 // and colors used, not the coloring itself)
