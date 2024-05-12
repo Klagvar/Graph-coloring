@@ -17,12 +17,12 @@ enum ColoringMethod {
   seq_ldf,
   rec_rlf,
   par_jp,
-  color_op_ver,
-  color_op_ed
+  par_opt_ver,
+  par_opt_ed
 };
 
 const std::vector<std::string> coloring_methods = {
-    "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "color_op_ver", "color_op_ed"};
+    "seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "par_opt_ver", "par_opt_ed"};
 
 struct Node {
   int index;
@@ -706,10 +706,10 @@ std::vector<unsigned int> GRAPH_color(std::shared_ptr<Graph> G, std::string colo
     case par_jp:
       return color_parallel_jp(G, n_threads);
       break;
-    case color_op_ver:
+    case par_opt_ver:
       return color_ver_optimize_parallel(G, n_threads);
       break;  
-    case color_op_ed:
+    case par_opt_ed:
       return color_ed_optimize_parallel(G, n_threads);
       break;
     default:
