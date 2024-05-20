@@ -259,51 +259,6 @@ std::vector<unsigned int> color_parallel_jp(std::shared_ptr<Graph> G, unsigned i
 }
 
 /* Алгоритмы оптимизации расскраски */
-
-// Раскраска графа для оптимизации расскраски
-void color_for_optimize(std::shared_ptr<Graph> G, unsigned int current_colors) {
-  unsigned int n = G->V;
-  for (unsigned int i = 0; i < n; i++) {
-    // Инициализируем вектор подсчета цветов
-    std::vector<unsigned int> color_counts(current_colors, 0);
-    // Подсчитываем количество каждого цвета среди соседей
-    for (auto t = G->ladj[i]; t != G->z; t = t->next) {
-      if (G->color[t->index] != 0) { // Если сосед раскрашен
-        color_counts[G->color[t->index] - 1]++;
-      }
-    }
-    // Выбор цвета с наименьшим количеством повторений
-    unsigned int min_color = 0;
-    for (unsigned int j = 1; j < current_colors; j++) {
-      if (color_counts[j] < color_counts[min_color]) {
-        min_color = j;
-      }
-    }
-    // Раскрашиваем вершину в оптимальный цвет
-    G->color[i] = min_color + 1;
-  }
-}
-
-// Перекраска лучшей вершины
-void best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_colors, int best_vertex) {
-  // Инициализируем вектор подсчета цветов
-  std::vector<unsigned int> color_counts(current_colors, 0);
-  // Подсчитываем количество каждого цвета среди соседей
-  for (auto t = G->ladj[best_vertex]; t != G->z; t = t->next) {
-    color_counts[G->color[t->index] - 1]++;
-  }
-  // Выбор цвета с наименьшим количеством повторений
-  unsigned int min_color = 0;
-  for (unsigned int i = 1; i < current_colors; i++) {
-    if (color_counts[i] < color_counts[min_color]) {
-      min_color = i;
-    }
-  }
-  // Раскрашиваем вершину в оптимальный цвет
-  G->color[best_vertex] = min_color + 1;
-}
-
-// Подсчёт количества ошибок (соседей с таким-же цветом)
 unsigned int count_mist(std::shared_ptr<Graph> G, int v) {
   unsigned int mist = 0;
   for (auto t = G->ladj[v]; t != G->z; t = t->next) {
@@ -313,6 +268,104 @@ unsigned int count_mist(std::shared_ptr<Graph> G, int v) {
   }
   return mist;
 }
+// Пересчитываем ошибки для всех вершин
+std::vector<unsigned int> calculate_all_mistakes(std::shared_ptr<Graph> G) {
+  unsigned int n = G->V;
+  std::vector<unsigned int> mistakes(n, 0);
+  for (unsigned int i = 0; i < n; i++) {
+    mistakes[i] = count_mist(G, i);
+  }
+  return mistakes;
+}
+
+// Обновляем ошибки для соседей вершины
+void update_neighbors_mistakes(std::shared_ptr<Graph> G, std::vector<unsigned int>& mistakes, int vertex) {
+  for (auto t = G->ladj[vertex]; t != G->z; t = t->next) {
+    mistakes[t->index] = count_mist(G, t->index);
+  }
+}
+
+void color_for_optimize(std::shared_ptr<Graph> G, unsigned int current_colors) {
+  unsigned int n = G->V;
+  for (unsigned int i = 0; i < n; i++) {
+    std::vector<unsigned int> color_counts(current_colors, 0);
+    for (auto t = G->ladj[i]; t != G->z; t = t->next) {
+      if (G->color[t->index] != 0) {
+        color_counts[G->color[t->index] - 1]++;
+      }
+    }
+    unsigned int min_color = 0;
+    for (unsigned int j = 1; j < current_colors; j++) {
+      if (color_counts[j] < color_counts[min_color]) {
+        min_color = j;
+      }
+    }
+    G->color[i] = min_color + 1;
+  }
+}
+
+void best_vertex_color(std::shared_ptr<Graph> G, unsigned int current_colors, int best_vertex, std::vector<unsigned int>& mistakes) {
+  std::vector<unsigned int> color_counts(current_colors, 0);
+  for (auto t = G->ladj[best_vertex]; t != G->z; t = t->next) {
+    color_counts[G->color[t->index] - 1]++;
+  }
+  unsigned int min_color = 0;
+  for (unsigned int i = 1; i < current_colors; i++) {
+    if (color_counts[i] < color_counts[min_color]) {
+      min_color = i;
+    }
+  }
+  G->color[best_vertex] = min_color + 1;
+  // Обновляем ошибки для перекрашенной вершины и её соседей
+  mistakes[best_vertex] = count_mist(G, best_vertex);
+  update_neighbors_mistakes(G, mistakes, best_vertex);
+}
+
+
+std::vector<unsigned int> color_ed_optimize(std::shared_ptr<Graph> G) {
+  unsigned int n = G->V;
+  for (unsigned int i = 0; i < n; i++) {
+    G->color[i] = 0;
+  }
+  unsigned int current_colors = 2;
+
+  do {
+    color_for_optimize(G, current_colors);
+
+    std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
+    std::vector<unsigned int> mistakes = calculate_all_mistakes(G);
+
+    while (1) {
+      int best_ed_v1 = -1;
+      int best_ed_v2 = -1;
+      unsigned int max_mist = 0;
+
+      for (unsigned int i = 0; i < n; i++) {
+        unsigned int mist_v1 = mistakes[i];
+
+        for (auto t = G->ladj[i]; t != G->z; t = t->next) {
+          if (proc_edges[i][t->index]) continue;
+          unsigned int mist_v2 = mistakes[t->index];
+          if (mist_v1 + mist_v2 > max_mist) {
+            max_mist = mist_v1 + mist_v2;
+            best_ed_v1 = i;
+            best_ed_v2 = t->index;
+          }
+        }
+      }
+
+      if (best_ed_v1 == -1 || best_ed_v2 == -1) break;
+      proc_edges[best_ed_v1][best_ed_v2] = 1;
+      proc_edges[best_ed_v2][best_ed_v1] = 1;
+      best_vertex_color(G, current_colors, best_ed_v1, mistakes);
+      best_vertex_color(G, current_colors, best_ed_v2, mistakes);
+    }
+    current_colors++;
+  } while (!GRAPH_check_given_coloring_validity(G, G->color));
+
+  return G->color;
+}
+
 
 /* Оптимизация расскраски для вершин */
 std::vector<unsigned int> color_ver_optimize(std::shared_ptr<Graph> G) {
@@ -349,7 +402,7 @@ std::vector<unsigned int> color_ver_optimize(std::shared_ptr<Graph> G) {
 
       //Отмечаем вершиу как обработанную и перекрашиваем
       proc[best_vertex] = 1;
-      best_vertex_color(G, current_colors, best_vertex);
+      //best_vertex_color(G, current_colors, best_vertex);
     }
     current_colors++;
   } while (!GRAPH_check_given_coloring_validity(G, G->color));
@@ -357,60 +410,6 @@ std::vector<unsigned int> color_ver_optimize(std::shared_ptr<Graph> G) {
   return G->color;
 }
 
-
-/* Оптимизация расскраски для ребер */
-std::vector<unsigned int> color_ed_optimize(std::shared_ptr<Graph> G) {
-  unsigned int n = G->V;
-  for (unsigned int i = 0; i < n; i++) {
-    G->color[i] = 0;
-  }
-  unsigned int current_colors = 2;
-  // Пока расскраска не будет валидна
-  do
-  {
-    // Расскрашиваю граф в текущее количество цветов на подобии с жадной расскраской
-    color_for_optimize(G, current_colors);
-    
-    // Квадратный вектор для поиска уже обработанных рёбер
-    std::vector<std::vector<int>> proc_edges(n, std::vector<int>(n, 0));
-
-    while(1)
-    {
-      int best_ed_v1 = -1;
-      int best_ed_v2 = -1;
-      unsigned int max_mist = 0;
-
-      // Выбираем ребро с максимальным количеством соседей с таким-же цветом
-      for (unsigned int i = 0; i < n; i++) {
-        // Подсчёт ошибок для первой вершины
-        unsigned int mist_v1 = count_mist(G, i);
-
-        //Подсчёт количества соседей с таким же цветом для каждого соседа. И поиск лучшего ребра
-        for (auto t = G->ladj[i]; t != G->z; t = t->next) {
-          // Если ребро уже было обработано пропускаем
-          if(proc_edges[i][t->index]) continue;
-          unsigned int mist_v2 = count_mist(G, t->index);
-          if (mist_v1 + mist_v2 > max_mist) {
-            max_mist = mist_v1 + mist_v2;
-            best_ed_v1 = i;
-            best_ed_v2 = t->index;
-          }
-        }
-      }
-
-      // Если не нашли лучшего ребра, выходим из цикла
-      if (best_ed_v1 == -1 || best_ed_v2 == -1) break;
-      // Перекрашиваем лучшее ребро
-      proc_edges[best_ed_v1][best_ed_v2] = 1;
-      proc_edges[best_ed_v2][best_ed_v1] = 1;
-      best_vertex_color(G, current_colors, best_ed_v1);
-      best_vertex_color(G, current_colors, best_ed_v2);
-    }
-    current_colors++;
-  } while (!GRAPH_check_given_coloring_validity(G, G->color));
-
-  return G->color;
-}
 
 /* EXPOSED FUNCTIONS */
 bool GRAPH_check_given_coloring_validity(std::shared_ptr<Graph> G, std::vector<unsigned int> &colors) {
