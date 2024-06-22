@@ -10,7 +10,7 @@
 #include "graph.h"
 #include "util.h"
 
-#define N_COLORING_METHODS 1
+#define N_COLORING_METHODS 6
 
 struct Results {
   std::string graph_name;
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
     n_threads = get_nprocs();
   }
 
-  std::vector<std::string> coloring_methods = {"color_op_ed"};
+  std::vector<std::string> coloring_methods = {"seq_greedy", "seq_ldf", "rec_rlf", "par_jp", "par_opt_ver", "par_opt_ed"};
 
   Results res;  // struct to hold the results of a coloring (in terms of time
                 // and colors used, not the coloring itself)

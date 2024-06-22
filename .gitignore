@@ -1,2 +1,4 @@
 .vscode/
-/reults/*.csv
+results/*.csv
+results/plots/*.png
+
